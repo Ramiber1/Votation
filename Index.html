@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VotaFácil — Plataforma de Votações</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.25s ease-out forwards',
+                        'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'shake': 'shake 0.4s cubic-bezier(.36,.07,.19,.97) both',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(12px) scale(0.98)' },
+                            '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+                        },
+                        shake: {
+                            '10%, 90%': { transform: 'translate3d(-1px, 0, 0)' },
+                            '20%, 80%': { transform: 'translate3d(2px, 0, 0)' },
+                            '30%, 50%, 70%': { transform: 'translate3d(-4px, 0, 0)' },
+                            '40%, 60%': { transform: 'translate3d(4px, 0, 0)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+        .progress-bar-fill {
+            transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800 antialiased selection:bg-indigo-100 selection:text-indigo-800">
+
+    <!-- Notificação Toast Flutuante -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Cabeçalho (Navbar) -->
+    <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+            <!-- Logo e Título -->
+            <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+                    <i data-lucide="vote" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-extrabold text-lg tracking-tight text-slate-900 leading-none">Vota<span class="text-indigo-600">Fácil</span></h1>
+                        <span id="live-sync-badge" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                            Conectando...
+                        </span>
+                    </div>
+                    <p class="text-[11px] font-medium text-slate-500 mt-0.5">Sincronizado para todos em tempo real</p>
+                </div>
+            </div>
+
+            <!-- Controles de Acesso do Administrador -->
+            <div id="header-auth-controls" class="flex items-center gap-2">
+                <!-- Renderizado dinamicamente via JS -->
+            </div>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-8">
+
+        <!-- Seletor de Enquetes (caso haja mais de uma enquete disponível) -->
+        <section id="poll-selector-section" class="hidden animate-fade-in">
+            <div class="flex items-center justify-between mb-2.5">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-500"></i>
+                    Enquetes Disponíveis
+                </span>
+                <span id="poll-count-badge" class="text-xs font-medium text-slate-400"></span>
+            </div>
+            <div id="poll-tabs-container" class="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                <!-- Abas das enquetes renderizadas aqui -->
+            </div>
+        </section>
+
+        <!-- Painel Exclusivo do Administrador (Visível apenas quando logado) -->
+        <section id="admin-panel" class="hidden animate-slide-up">
+            <div class="bg-white rounded-2xl border-2 border-indigo-500/30 shadow-xl shadow-indigo-950/5 overflow-hidden">
+                <!-- Barra Superior do Admin -->
+                <div class="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 px-6 py-4 flex flex-wrap items-center justify-between gap-3 text-white">
+                    <div class="flex items-center gap-2.5">
+                        <div class="p-1.5 bg-white/15 rounded-lg backdrop-blur-sm">
+                            <i data-lucide="shield-check" class="w-5 h-5 text-emerald-300"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-base leading-tight">Painel do Administrador</h2>
+                            <p class="text-xs text-indigo-100">Crie novas votações ou gerencie as existentes</p>
+                        </div>
+                    </div>
+                    <button onclick="toggleCreateForm()" id="btn-toggle-create" class="px-3.5 py-2 rounded-xl bg-white text-indigo-700 hover:bg-indigo-50 font-semibold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm transition active:scale-95">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                        <span>Nova Votação</span>
+                    </button>
+                </div>
+
+                <!-- Formulário de Criação de Enquete -->
+                <div id="create-poll-form-wrapper" class="p-6 border-b border-slate-100 bg-slate-50/60">
+                    <form id="create-poll-form" onsubmit="handleCreatePoll(event)" class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+                                <i data-lucide="sparkles" class="w-4 h-4 text-indigo-600"></i>
+                                Criar Nova Enquete
+                            </h3>
+                        </div>
+
+                        <div>
+                            <label for="new-poll-title" class="block text-xs font-semibold text-slate-700 mb-1.5">Pergunta ou Título da Votação *</label>
+                            <input type="text" id="new-poll-title" required maxlength="140" placeholder="Ex: Qual será o tema da próxima festa?"
+                                class="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                        </div>
+
+                        <div>
+                            <label for="new-poll-desc" class="block text-xs font-semibold text-slate-700 mb-1.5">Descrição <span class="text-slate-400 font-normal">(opcional)</span></label>
+                            <input type="text" id="new-poll-desc" maxlength="240" placeholder="Ex: Vote na sua opção favorita até sexta-feira!"
+                                class="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="block text-xs font-semibold text-slate-700">Opções de Voto * <span class="text-slate-400 font-normal">(mínimo 2)</span></label>
+                                <button type="button" onclick="addOptionInput()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-indigo-50 transition">
+                                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                                    Adicionar opção
+                                </button>
+                            </div>
+                            <div id="options-inputs-container" class="space-y-2.5">
+                                <!-- Inputs das opções gerados via JS -->
+                            </div>
+                        </div>
+
+                        <div class="pt-2 flex flex-wrap items-center justify-end gap-2.5">
+                            <button type="button" onclick="resetCreateForm()" class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-100 font-medium text-sm transition">
+                                Limpar Campos
+                            </button>
+                            <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md shadow-indigo-600/20 flex items-center gap-2 transition active:scale-95">
+                                <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                                Publicar Votação
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Gerenciamento da Enquete Atual -->
+                <div id="admin-current-poll-actions" class="px-6 py-4 bg-white flex flex-wrap items-center justify-between gap-3">
+                    <div class="text-xs text-slate-500 flex flex-wrap items-center gap-2">
+                        <span>Visualizando: <strong id="admin-active-poll-name" class="text-slate-800"></strong></span>
+                        <span id="admin-public-status-badge"></span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" id="btn-set-public-poll" onclick="setPublicActivePoll()" class="px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs flex items-center gap-1.5 transition">
+                            <i data-lucide="globe" class="w-3.5 h-3.5"></i>
+                            Definir como Principal para Todos
+                        </button>
+                        <button type="button" onclick="openConfirmAction('reset')" class="px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold text-xs flex items-center gap-1.5 transition">
+                            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                            Zerar Votos
+                        </button>
+                        <button type="button" onclick="openConfirmAction('delete')" class="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs flex items-center gap-1.5 transition">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            Excluir Enquete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Card Principal da Votação Pública -->
+        <section id="active-poll-card" class="bg-white rounded-3xl border border-slate-200/90 shadow-xl shadow-slate-200/50 overflow-hidden animate-fade-in">
+            <div class="p-12 text-center space-y-3">
+                <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto animate-pulse">
+                    <i data-lucide="cloud" class="w-6 h-6"></i>
+                </div>
+                <p class="text-sm font-semibold text-slate-600">Carregando votações ao vivo...</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Rodapé -->
+    <footer class="border-t border-slate-200/70 bg-white/60 py-5 mt-12">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+            <p>Plataforma de Votação Interativa &bull; Resultados atualizados instantaneamente</p>
+            <p class="flex items-center gap-1">
+                <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-400"></i>
+                Criação restrita a administradores autorizados
+            </p>
+        </div>
+    </footer>
+
+    <!-- Modal de Login do Administrador -->
+    <div id="login-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+        <div id="login-modal-box" class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 animate-slide-up relative">
+            <button onclick="closeLoginModal()" aria-label="Fechar modal" class="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 border border-indigo-100">
+                <i data-lucide="key-round" class="w-6 h-6"></i>
+            </div>
+
+            <h3 class="text-xl font-extrabold text-slate-900">Acesso do Administrador</h3>
+            <p class="text-sm text-slate-500 mt-1">Digite a senha secreta para liberar a criação e edição de votações.</p>
+
+            <form id="admin-login-form" onsubmit="handleAdminLogin(event)" class="mt-6 space-y-4">
+                <div>
+                    <label for="admin-password-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Senha de Acesso</label>
+                    <div class="relative">
+                        <input type="password" id="admin-password-input" autocomplete="off" required placeholder="Digite a senha..."
+                            class="w-full pl-4 pr-11 py-3 rounded-xl border border-slate-300 text-slate-900 placeholder-slate-400 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                        <button type="button" onclick="togglePasswordVisibility()" title="Mostrar/Ocultar senha"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+                            <i id="eye-icon" data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <!-- Mensagem de erro caso a senha esteja errada -->
+                    <p id="login-error-msg" class="hidden mt-2 text-xs font-semibold text-rose-600 flex items-center gap-1.5 bg-rose-50 px-3 py-2 rounded-lg border border-rose-100">
+                        <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+                        <span>Senha incorreta! Apenas quem sabe a senha exata pode entrar.</span>
+                    </p>
+                </div>
+
+                <div class="pt-2 flex items-center gap-3">
+                    <button type="button" onclick="closeLoginModal()" class="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold text-sm transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="flex-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-lg shadow-indigo-600/25 transition active:scale-95">
+                        Entrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Customizado de Confirmação (Substitui confirm() nativo) -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 animate-slide-up">
+            <div id="confirm-icon-wrapper" class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
+                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+            </div>
+            <h3 id="confirm-title" class="text-lg font-extrabold text-slate-900">Confirmar ação</h3>
+            <p id="confirm-desc" class="text-sm text-slate-500 mt-1.5 leading-relaxed">Tem certeza que deseja continuar?</p>
+            <div class="mt-6 flex items-center gap-3">
+                <button type="button" onclick="closeConfirmModal()" class="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold text-sm transition">
+                    Cancelar
+                </button>
+                <button type="button" id="confirm-proceed-btn" class="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm shadow-md transition active:scale-95">
+                    Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // =========================================================================
+        // CONFIGURAÇÃO DO FIREBASE E ESTADO GLOBAL
+        // =========================================================================
+        const ADMIN_SECRET = "SIX SEVEN";
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+
+        let app = null;
+        let db = null;
+        let auth = null;
+        let currentUser = null;
+
+        // Estado sincronizado da nuvem
+        let polls = [];
+        let globalActivePollId = null; // Enquete destacada para todos pelo Admin
+        let selectedPollId = null;     // Enquete atualmente visualizada na tela
+        let userVotes = {};            // Votos registrados por este navegador/usuário
+        let isAdmin = false;
+        let pendingConfirmAction = null;
+        let isInitialLoadDone = false;
+
+        // Identificador único deste navegador para evitar voto duplicado mesmo se recarregar
+        const BROWSER_DEVICE_ID_KEY = "votafacil_device_token";
+        function getDeviceVoterId() {
+            try {
+                let id = window.name;
+                if (!id || !id.startsWith("vf_voter_")) {
+                    id = "vf_voter_" + crypto.randomUUID();
+                    window.name = id;
+                }
+                return id;
+            } catch (e) {
+                return currentUser?.uid || "anon_" + Math.random().toString(36).slice(2);
+            }
+        }
+        const deviceVoterId = getDeviceVoterId();
+
+        // Enquete inicial caso o banco esteja vazio na primeira vez
+        const DEFAULT_SEED_POLL = {
+            id: "poll-inicial-oficial",
+            title: "Qual deve ser o próximo grande evento da galera?",
+            description: "Escolha a melhor opção abaixo! Todos os votos aparecem ao vivo para todo mundo.",
+            createdAt: "Enquete Oficial",
+            createdTimestamp: Date.now(),
+            options: [
+                { id: "opt-1", text: "🍕 Noite da Pizza e Jogos de Tabuleiro", votes: 0 },
+                { id: "opt-2", text: "🎬 Maratona de Filmes no Cinema", votes: 0 },
+                { id: "opt-3", text: "🥩 Churrasco no Fim de Semana", votes: 0 },
+                { id: "opt-4", text: "🎮 Campeonato de Videogame Online", votes: 0 }
+            ]
+        };
+
+        // =========================================================================
+        // INICIALIZAÇÃO E AUTENTICAÇÃO FIREBASE (REGRA 3)
+        // =========================================================================
+        async function initApp() {
+            initCreateFormInputs();
+            lucide.createIcons();
+
+            if (!firebaseConfig) {
+                updateSyncBadge("offline");
+                showToast("Configuração de nuvem indisponível.", "error");
+                return;
+            }
+
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Autenticar antes de qualquer consulta ao Firestore
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUser = user;
+                        startRealtimeListeners();
+                    }
+                });
+            } catch (error) {
+                console.error("Erro na inicialização do Firebase:", error);
+                updateSyncBadge("offline");
+                showToast("Erro ao conectar ao servidor ao vivo.", "error");
+            }
+        }
+
+        // =========================================================================
+        // ESCUTA EM TEMPO REAL (ONSNAPSHOT) - COLEÇÕES PÚBLICAS
+        // =========================================================================
+        function startRealtimeListeners() {
+            if (!currentUser || !db) return;
+
+            // Caminhos estritos conforme Regra 1: /artifacts/{appId}/public/data/{collectionName}
+            const pollsColRef = collection(db, 'artifacts', appId, 'public', 'data', 'polls');
+            const settingsDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global');
+            const voterDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'voters', deviceVoterId);
+
+            // 1. Escutar todas as enquetes em tempo real
+            onSnapshot(pollsColRef, async (snapshot) => {
+                updateSyncBadge("online");
+
+                if (snapshot.empty && !isInitialLoadDone) {
+                    isInitialLoadDone = true;
+                    // Cria a enquete inicial compartilhada para todos
+                    try {
+                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'polls', DEFAULT_SEED_POLL.id), DEFAULT_SEED_POLL);
+                        await setDoc(settingsDocRef, { activePollId: DEFAULT_SEED_POLL.id }, { merge: true });
+                    } catch (seedErr) {
+                        console.error("Erro ao criar enquete inicial:", seedErr);
+                    }
+                    return;
+                }
+
+                isInitialLoadDone = true;
+                const loadedPolls = [];
+                snapshot.forEach((docSnap) => {
+                    loadedPolls.push({ id: docSnap.id, ...docSnap.data() });
+                });
+
+                // Ordenar em memória (mais recentes primeiro) - Regra 2
+                loadedPolls.sort((a, b) => (b.createdTimestamp || 0) - (a.createdTimestamp || 0));
+                polls = loadedPolls;
+
+                // Ajustar enquete selecionada
+                if (polls.length === 0) {
+                    selectedPollId = null;
+                } else if (!selectedPollId || !polls.some(p => p.id === selectedPollId)) {
+                    if (globalActivePollId && polls.some(p => p.id === globalActivePollId)) {
+                        selectedPollId = globalActivePollId;
+                    } else {
+                        selectedPollId = polls[0].id;
+                    }
+                }
+
+                renderAll();
+            }, (error) => {
+                console.error("Erro no listener de enquetes:", error);
+                updateSyncBadge("offline");
+            });
+
+            // 2. Escutar configuração global (qual enquete está definida como principal para todos)
+            onSnapshot(settingsDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    const newGlobalId = data.activePollId || null;
+                    const changed = globalActivePollId !== newGlobalId;
+                    globalActivePollId = newGlobalId;
+
+                    // Se o admin mudou a enquete principal, atualizar automaticamente para os visitantes
+                    if (changed && globalActivePollId && polls.some(p => p.id === globalActivePollId) && !isAdmin) {
+                        selectedPollId = globalActivePollId;
+                    }
+                    renderAll();
+                }
+            }, (error) => {
+                console.error("Erro no listener de configurações:", error);
+            });
+
+            // 3. Escutar registro de votos deste navegador/dispositivo na nuvem
+            onSnapshot(voterDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    userVotes = docSnap.data().votes || {};
+                } else {
+                    userVotes = {};
+                }
+                renderAll();
+            }, (error) => {
+                console.error("Erro no listener de votos do usuário:", error);
+            });
+        }
+
+        function updateSyncBadge(status) {
+            const badge = document.getElementById("live-sync-badge");
+            if (!badge) return;
+
+            if (status === "online") {
+                badge.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] sm:text-[11px] font-bold";
+                badge.innerHTML = `
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Ao vivo • Sincronizado para todos
+                `;
+            } else {
+                badge.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] sm:text-[11px] font-bold";
+                badge.innerHTML = `
+                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                    Reconectando...
+                `;
+            }
+        }
+
+        // =========================================================================
+        // RENDERIZAÇÃO DA INTERFACE
+        // =========================================================================
+        function renderAll() {
+            renderHeaderAuth();
+            renderAdminPanel();
+            renderPollSelector();
+            renderActivePoll();
+            lucide.createIcons();
+        }
+
+        function renderHeaderAuth() {
+            const container = document.getElementById("header-auth-controls");
+            if (isAdmin) {
+                container.innerHTML = `
+                    <span class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Modo Admin Ativo
+                    </span>
+                    <button onclick="handleLogout()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 font-semibold text-xs sm:text-sm flex items-center gap-1.5 transition active:scale-95">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                        <span>Sair</span>
+                    </button>
+                `;
+            } else {
+                container.innerHTML = `
+                    <button onclick="openLoginModal()" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition active:scale-95">
+                        <i data-lucide="lock" class="w-4 h-4"></i>
+                        <span>Área do Admin</span>
+                    </button>
+                `;
+            }
+        }
+
+        function renderAdminPanel() {
+            const panel = document.getElementById("admin-panel");
+            const activePoll = polls.find(p => p.id === selectedPollId);
+            const actionsBar = document.getElementById("admin-current-poll-actions");
+            const statusBadge = document.getElementById("admin-public-status-badge");
+            const setPublicBtn = document.getElementById("btn-set-public-poll");
+
+            if (isAdmin) {
+                panel.classList.remove("hidden");
+                if (activePoll) {
+                    actionsBar.classList.remove("hidden");
+                    document.getElementById("admin-active-poll-name").textContent = activePoll.title;
+
+                    const isGlobalMain = globalActivePollId === activePoll.id;
+                    if (isGlobalMain) {
+                        statusBadge.innerHTML = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold"><i data-lucide="check" class="w-3 h-3"></i> Principal para todos</span>`;
+                        setPublicBtn.classList.add("hidden");
+                    } else {
+                        statusBadge.innerHTML = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-medium">Secundária</span>`;
+                        setPublicBtn.classList.remove("hidden");
+                    }
+                } else {
+                    actionsBar.classList.add("hidden");
+                }
+            } else {
+                panel.classList.add("hidden");
+            }
+        }
+
+        function renderPollSelector() {
+            const section = document.getElementById("poll-selector-section");
+            const tabsContainer = document.getElementById("poll-tabs-container");
+            const badge = document.getElementById("poll-count-badge");
+
+            if (polls.length <= 1) {
+                section.classList.add("hidden");
+                return;
+            }
+
+            section.classList.remove("hidden");
+            badge.textContent = `${polls.length} votações disponíveis`;
+
+            tabsContainer.innerHTML = polls.map((poll) => {
+                const isSelected = poll.id === selectedPollId;
+                const isGlobalMain = poll.id === globalActivePollId;
+                const hasVoted = Boolean(userVotes[poll.id]);
+                return `
+                    <button onclick="selectPoll('${poll.id}')"
+                        class="shrink-0 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-2 ${
+                            isSelected
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                        }">
+                        ${isGlobalMain ? `<i data-lucide="star" class="w-3.5 h-3.5 ${isSelected ? 'text-amber-300 fill-amber-300' : 'text-amber-500 fill-amber-500'}"></i>` : ''}
+                        <span class="truncate max-w-[180px] sm:max-w-[240px]">${escapeHTML(poll.title)}</span>
+                        ${hasVoted ? `<i data-lucide="check-circle-2" class="w-3.5 h-3.5 ${isSelected ? 'text-emerald-300' : 'text-emerald-500'}"></i>` : ''}
+                    </button>
+                `;
+            }).join("");
+        }
+
+        function renderActivePoll() {
+            const card = document.getElementById("active-poll-card");
+            const poll = polls.find(p => p.id === selectedPollId);
+
+            if (!poll) {
+                card.innerHTML = `
+                    <div class="p-12 text-center space-y-3">
+                        <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                            <i data-lucide="inbox" class="w-7 h-7"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-800">Nenhuma votação ativa no momento</h3>
+                        <p class="text-sm text-slate-500 max-w-md mx-auto">O administrador ainda não criou nenhuma enquete. Entre na Área do Admin para publicar a primeira votação para todos!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const totalVotes = (poll.options || []).reduce((sum, opt) => sum + (opt.votes || 0), 0);
+            const selectedOptionId = userVotes[poll.id] || null;
+            const hasVoted = Boolean(selectedOptionId);
+            const maxVotes = totalVotes > 0 ? Math.max(...poll.options.map(o => o.votes || 0)) : 0;
+
+            const optionsHTML = (poll.options || []).map(option => {
+                const votesCount = option.votes || 0;
+                const percentage = totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0;
+                const isUserChoice = selectedOptionId === option.id;
+                const isLeading = totalVotes > 0 && votesCount === maxVotes;
+
+                return `
+                    <button type="button"
+                        onclick="castVote('${poll.id}', '${option.id}')"
+                        ${hasVoted ? 'disabled' : ''}
+                        class="w-full text-left group relative overflow-hidden rounded-2xl border-2 p-4 sm:p-5 transition-all duration-200 ${
+                            isUserChoice
+                                ? 'border-indigo-600 bg-indigo-50/40 shadow-sm'
+                                : hasVoted
+                                    ? 'border-slate-200/90 bg-white cursor-default'
+                                    : 'border-slate-200 bg-white hover:border-indigo-400 hover:shadow-md cursor-pointer active:scale-[0.99]'
+                        }">
+
+                        <!-- Barra de Progresso no Fundo -->
+                        <div class="progress-bar-fill absolute inset-y-0 left-0 pointer-events-none ${
+                            isUserChoice
+                                ? 'bg-indigo-500/15'
+                                : isLeading && totalVotes > 0
+                                    ? 'bg-emerald-500/10'
+                                    : 'bg-slate-100/90'
+                        }" style="width: ${percentage}%"></div>
+
+                        <!-- Conteúdo da Opção -->
+                        <div class="relative z-10 flex items-center justify-between gap-4">
+                            <div class="flex items-center gap-3.5 min-w-0">
+                                <div class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition ${
+                                    isUserChoice
+                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                        : hasVoted
+                                            ? 'border-2 border-slate-300 bg-white'
+                                            : 'border-2 border-slate-300 group-hover:border-indigo-500 bg-white'
+                                }">
+                                    ${isUserChoice ? '<i data-lucide="check" class="w-3.5 h-3.5 stroke-[3]"></i>' : ''}
+                                </div>
+
+                                <div class="min-w-0">
+                                    <span class="font-bold text-sm sm:text-base text-slate-800 block truncate sm:whitespace-normal">
+                                        ${escapeHTML(option.text)}
+                                    </span>
+                                    ${isUserChoice ? `
+                                        <span class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 mt-0.5">
+                                            Seu voto registrado
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            </div>
+
+                            <div class="text-right shrink-0">
+                                <div class="text-base sm:text-lg font-extrabold ${isUserChoice ? 'text-indigo-700' : 'text-slate-800'}">
+                                    ${percentage}%
+                                </div>
+                                <div class="text-xs font-medium text-slate-500">
+                                    ${votesCount} ${votesCount === 1 ? 'voto' : 'votos'}
+                                </div>
+                            </div>
+                        </div>
+                    </button>
+                `;
+            }).join("");
+
+            card.innerHTML = `
+                <!-- Cabeçalho do Card da Enquete -->
+                <div class="p-6 sm:p-8 border-b border-slate-100 bg-gradient-to-b from-slate-50/80 to-white">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                            hasVoted
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                        }">
+                            <i data-lucide="${hasVoted ? 'check-circle-2' : 'radio'}" class="w-3.5 h-3.5"></i>
+                            ${hasVoted ? 'Voto Confirmado' : 'Votação Aberta'}
+                        </span>
+                        <span class="text-xs font-semibold text-slate-400">
+                            ${escapeHTML(poll.createdAt || 'Enquete Ativa')}
+                        </span>
+                    </div>
+
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-snug">
+                        ${escapeHTML(poll.title)}
+                    </h2>
+
+                    ${poll.description ? `
+                        <p class="mt-2 text-sm sm:text-base text-slate-600 leading-relaxed">
+                            ${escapeHTML(poll.description)}
+                        </p>
+                    ` : ''}
+                </div>
+
+                <!-- Lista de Opções -->
+                <div class="p-6 sm:p-8 space-y-3.5">
+                    ${optionsHTML}
+                </div>
+
+                <!-- Rodapé do Card -->
+                <div class="px-6 sm:px-8 py-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600">
+                        <i data-lucide="users" class="w-4 h-4 text-indigo-500"></i>
+                        <span>Total de votos: <strong class="text-slate-900">${totalVotes}</strong></span>
+                    </div>
+
+                    <div class="text-xs text-slate-500">
+                        ${hasVoted
+                            ? '<span class="text-emerald-700 font-semibold">Voto salvo na nuvem! Os resultados atualizam ao vivo.</span>'
+                            : 'Clique em uma opção acima para registrar seu voto para todos verem'}
+                    </div>
+                </div>
+            `;
+        }
+
+        // =========================================================================
+        // LÓGICA DE VOTAÇÃO SINCRONIZADA NA NUVEM (TRANSAÇÃO ATÔMICA)
+        // =========================================================================
+        async function castVote(pollId, optionId) {
+            if (!currentUser || !db) {
+                showToast("Aguarde a conexão com o servidor...", "info");
+                return;
+            }
+
+            if (userVotes[pollId]) {
+                showToast("Você já votou nesta enquete!", "info");
+                return;
+            }
+
+            // Atualização otimista imediata na tela
+            userVotes[pollId] = optionId;
+            renderAll();
+
+            const pollDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'polls', pollId);
+            const voterDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'voters', deviceVoterId);
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const pollSnap = await transaction.get(pollDocRef);
+                    if (!pollSnap.exists()) {
+                        throw new Error("Enquete não encontrada.");
+                    }
+
+                    const voterSnap = await transaction.get(voterDocRef);
+                    const existingVotes = voterSnap.exists() ? (voterSnap.data().votes || {}) : {};
+
+                    // Impede voto duplicado no banco
+                    if (existingVotes[pollId]) {
+                        return;
+                    }
+
+                    const pollData = pollSnap.data();
+                    const updatedOptions = (pollData.options || []).map(opt => {
+                        if (opt.id === optionId) {
+                            return { ...opt, votes: (opt.votes || 0) + 1 };
+                        }
+                        return opt;
+                    });
+
+                    transaction.update(pollDocRef, { options: updatedOptions });
+                    transaction.set(voterDocRef, {
+                        votes: { ...existingVotes, [pollId]: optionId },
+                        updatedAt: Date.now()
+                    }, { merge: true });
+                });
+
+                showToast("Voto registrado ao vivo para todos!", "success");
+            } catch (error) {
+                console.error("Erro ao registrar voto:", error);
+                delete userVotes[pollId];
+                renderAll();
+                showToast("Não foi possível registrar seu voto. Tente novamente.", "error");
+            }
+        }
+
+        function selectPoll(pollId) {
+            selectedPollId = pollId;
+            renderAll();
+        }
+
+        // =========================================================================
+        // AUTENTICAÇÃO DO ADMINISTRADOR (SENHA: "SIX SEVEN")
+        // =========================================================================
+        function openLoginModal() {
+            const modal = document.getElementById("login-modal");
+            const input = document.getElementById("admin-password-input");
+            const errorMsg = document.getElementById("login-error-msg");
+
+            input.value = "";
+            input.type = "password";
+            document.getElementById("eye-icon").setAttribute("data-lucide", "eye");
+            errorMsg.classList.add("hidden");
+
+            modal.classList.remove("hidden");
+            modal.classList.add("flex");
+            lucide.createIcons();
+
+            setTimeout(() => input.focus(), 80);
+        }
+
+        function closeLoginModal() {
+            const modal = document.getElementById("login-modal");
+            modal.classList.add("hidden");
+            modal.classList.remove("flex");
+        }
+
+        function togglePasswordVisibility() {
+            const input = document.getElementById("admin-password-input");
+            const icon = document.getElementById("eye-icon");
+            if (input.type === "password") {
+                input.type = "text";
+                icon.setAttribute("data-lucide", "eye-off");
+            } else {
+                input.type = "password";
+                icon.setAttribute("data-lucide", "eye");
+            }
+            lucide.createIcons();
+        }
+
+        function handleAdminLogin(event) {
+            event.preventDefault();
+            const input = document.getElementById("admin-password-input");
+            const errorMsg = document.getElementById("login-error-msg");
+            const modalBox = document.getElementById("login-modal-box");
+
+            if (input.value.trim() === ADMIN_SECRET) {
+                isAdmin = true;
+                closeLoginModal();
+                renderAll();
+                showToast("Bem-vindo, Admin! Suas votações aparecerão para todos.", "success");
+            } else {
+                errorMsg.classList.remove("hidden");
+                modalBox.classList.remove("animate-shake");
+                void modalBox.offsetWidth;
+                modalBox.classList.add("animate-shake");
+                input.focus();
+                input.select();
+            }
+        }
+
+        function handleLogout() {
+            isAdmin = false;
+            renderAll();
+            showToast("Você saiu do modo administrador.", "info");
+        }
+
+        // =========================================================================
+        // CRIAÇÃO E GERENCIAMENTO DE ENQUETES NA NUVEM (APENAS ADMIN)
+        // =========================================================================
+        function initCreateFormInputs() {
+            const container = document.getElementById("options-inputs-container");
+            container.innerHTML = "";
+            addOptionInput("Opção 1");
+            addOptionInput("Opção 2");
+        }
+
+        function addOptionInput(placeholderText = "") {
+            const container = document.getElementById("options-inputs-container");
+            const count = container.children.length + 1;
+            const placeholder = placeholderText || `Opção ${count}`;
+
+            const row = document.createElement("div");
+            row.className = "flex items-center gap-2 option-input-row animate-fade-in";
+            row.innerHTML = `
+                <input type="text" required maxlength="100" placeholder="${placeholder}"
+                    class="option-field flex-1 px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                <button type="button" onclick="removeOptionInput(this)" title="Remover opção"
+                    class="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            `;
+            container.appendChild(row);
+            lucide.createIcons();
+        }
+
+        function removeOptionInput(btn) {
+            const container = document.getElementById("options-inputs-container");
+            if (container.children.length <= 2) {
+                showToast("A enquete precisa ter pelo menos 2 opções.", "error");
+                return;
+            }
+            btn.closest(".option-input-row").remove();
+        }
+
+        function toggleCreateForm() {
+            const wrapper = document.getElementById("create-poll-form-wrapper");
+            wrapper.classList.toggle("hidden");
+        }
+
+        function resetCreateForm() {
+            document.getElementById("new-poll-title").value = "";
+            document.getElementById("new-poll-desc").value = "";
+            initCreateFormInputs();
+        }
+
+        async function handleCreatePoll(event) {
+            event.preventDefault();
+            if (!isAdmin || !currentUser || !db) return;
+
+            const titleInput = document.getElementById("new-poll-title");
+            const descInput = document.getElementById("new-poll-desc");
+            const optionFields = document.querySelectorAll(".option-field");
+
+            const title = titleInput.value.trim();
+            const description = descInput.value.trim();
+            const optionsList = Array.from(optionFields)
+                .map(input => input.value.trim())
+                .filter(val => val.length > 0);
+
+            if (!title) {
+                showToast("Digite um título para a enquete.", "error");
+                return;
+            }
+
+            if (optionsList.length < 2) {
+                showToast("Adicione pelo menos 2 opções válidas.", "error");
+                return;
+            }
+
+            const now = new Date();
+            const formattedDate = `Criada em ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+            const newPollId = "poll-" + Date.now();
+
+            const newPoll = {
+                id: newPollId,
+                title: title,
+                description: description,
+                createdAt: formattedDate,
+                createdTimestamp: Date.now(),
+                options: optionsList.map((text, index) => ({
+                    id: `opt-${Date.now()}-${index}`,
+                    text: text,
+                    votes: 0
+                }))
+            };
+
+            try {
+                // Salva a nova enquete na coleção pública e já a define como ativa para todos
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'polls', newPollId), newPoll);
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global'), {
+                    activePollId: newPollId
+                }, { merge: true });
+
+                selectedPollId = newPollId;
+                resetCreateForm();
+                showToast("Votação publicada! Já está aparecendo para todo mundo.", "success");
+            } catch (error) {
+                console.error("Erro ao publicar votação:", error);
+                showToast("Erro ao publicar votação na nuvem.", "error");
+            }
+        }
+
+        async function setPublicActivePoll() {
+            if (!isAdmin || !selectedPollId || !currentUser || !db) return;
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global'), {
+                    activePollId: selectedPollId
+                }, { merge: true });
+                showToast("Esta enquete agora é a principal para todos!", "success");
+            } catch (error) {
+                console.error("Erro ao definir enquete principal:", error);
+                showToast("Erro ao atualizar enquete principal.", "error");
+            }
+        }
+
+        // =========================================================================
+        // MODAL DE CONFIRMAÇÃO (ZERAR VOTOS / EXCLUIR ENQUETE)
+        // =========================================================================
+        function openConfirmAction(actionType) {
+            if (!isAdmin || !selectedPollId) return;
+            pendingConfirmAction = actionType;
+
+            const modal = document.getElementById("confirm-modal");
+            const titleEl = document.getElementById("confirm-title");
+            const descEl = document.getElementById("confirm-desc");
+            const iconWrap = document.getElementById("confirm-icon-wrapper");
+            const proceedBtn = document.getElementById("confirm-proceed-btn");
+
+            if (actionType === "reset") {
+                titleEl.textContent = "Zerar todos os votos?";
+                descEl.textContent = "Todos os contadores desta enquete voltarão para zero em tempo real para todos os participantes.";
+                iconWrap.className = "w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4";
+                proceedBtn.className = "flex-1 py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-sm shadow-md transition active:scale-95";
+                proceedBtn.textContent = "Zerar Votos";
+            } else {
+                titleEl.textContent = "Excluir esta enquete?";
+                descEl.textContent = "Esta ação removerá permanentemente a enquete da tela de todos os usuários.";
+                iconWrap.className = "w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4";
+                proceedBtn.className = "flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm shadow-md transition active:scale-95";
+                proceedBtn.textContent = "Excluir";
+            }
+
+            proceedBtn.onclick = executePendingConfirmAction;
+            modal.classList.remove("hidden");
+            modal.classList.add("flex");
+            lucide.createIcons();
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById("confirm-modal");
+            modal.classList.add("hidden");
+            modal.classList.remove("flex");
+            pendingConfirmAction = null;
+        }
+
+        async function executePendingConfirmAction() {
+            if (!isAdmin || !selectedPollId || !currentUser || !db) return;
+
+            const targetPollId = selectedPollId;
+            closeConfirmModal();
+
+            try {
+                if (pendingConfirmAction === "reset") {
+                    const poll = polls.find(p => p.id === targetPollId);
+                    if (poll) {
+                        const resetOptions = poll.options.map(opt => ({ ...opt, votes: 0 }));
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'polls', targetPollId), {
+                            options: resetOptions
+                        });
+                        // Limpa também o voto local deste navegador para esta enquete
+                        const voterDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'voters', deviceVoterId);
+                        const updatedUserVotes = { ...userVotes };
+                        delete updatedUserVotes[targetPollId];
+                        await setDoc(voterDocRef, { votes: updatedUserVotes }, { merge: true });
+                        showToast("Votos zerados para todos!", "info");
+                    }
+                } else if (pendingConfirmAction === "delete") {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'polls', targetPollId));
+                    const remaining = polls.filter(p => p.id !== targetPollId);
+                    const nextId = remaining.length > 0 ? remaining[0].id : null;
+                    if (globalActivePollId === targetPollId) {
+                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'global'), {
+                            activePollId: nextId
+                        }, { merge: true });
+                    }
+                    selectedPollId = nextId;
+                    showToast("Enquete excluída para todos.", "info");
+                }
+            } catch (error) {
+                console.error("Erro ao executar ação administrativa:", error);
+                showToast("Erro ao atualizar dados na nuvem.", "error");
+            }
+        }
+
+        // =========================================================================
+        // UTILITÁRIOS (NOTIFICAÇÕES TOAST & ESCAPE HTML)
+        // =========================================================================
+        function showToast(message, type = "info") {
+            const container = document.getElementById("toast-container");
+            const toast = document.createElement("div");
+
+            const styles = {
+                success: "bg-slate-900 text-white border-emerald-500/40",
+                error: "bg-rose-600 text-white border-rose-400",
+                info: "bg-slate-800 text-white border-slate-700"
+            };
+
+            const icons = {
+                success: "check-circle-2",
+                error: "alert-circle",
+                info: "info"
+            };
+
+            const iconColors = {
+                success: "text-emerald-400",
+                error: "text-white",
+                info: "text-indigo-400"
+            };
+
+            toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-2xl border shadow-xl text-sm font-medium animate-slide-up ${styles[type] || styles.info}`;
+            toast.innerHTML = `
+                <i data-lucide="${icons[type] || icons.info}" class="w-4 h-4 shrink-0 ${iconColors[type] || ''}"></i>
+                <span>${escapeHTML(message)}</span>
+            `;
+
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.style.opacity = "0";
+                toast.style.transform = "translateY(8px)";
+                toast.style.transition = "all 0.25s ease";
+                setTimeout(() => toast.remove(), 250);
+            }, 3200);
+        }
+
+        function escapeHTML(str) {
+            if (!str) return "";
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Expor funções necessárias no escopo global para os handlers inline HTML
+        window.openLoginModal = openLoginModal;
+        window.closeLoginModal = closeLoginModal;
+        window.togglePasswordVisibility = togglePasswordVisibility;
+        window.handleAdminLogin = handleAdminLogin;
+        window.handleLogout = handleLogout;
+        window.toggleCreateForm = toggleCreateForm;
+        window.addOptionInput = addOptionInput;
+        window.removeOptionInput = removeOptionInput;
+        window.resetCreateForm = resetCreateForm;
+        window.handleCreatePoll = handleCreatePoll;
+        window.setPublicActivePoll = setPublicActivePoll;
+        window.selectPoll = selectPoll;
+        window.castVote = castVote;
+        window.openConfirmAction = openConfirmAction;
+        window.closeConfirmModal = closeConfirmModal;
+
+        // Fechar modais ao clicar fora ou pressionar ESC
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                closeLoginModal();
+                closeConfirmModal();
+            }
+        });
+
+        document.getElementById("login-modal").addEventListener("click", (e) => {
+            if (e.target.id === "login-modal") closeLoginModal();
+        });
+
+        document.getElementById("confirm-modal").addEventListener("click", (e) => {
+            if (e.target.id === "confirm-modal") closeConfirmModal();
+        });
+
+        // Iniciar aplicação ao carregar a janela
+        window.addEventListener("DOMContentLoaded", initApp);
+    </script>
+</body>
+</html>
